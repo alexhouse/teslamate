@@ -1,8 +1,8 @@
 import Config
 
 defmodule Util do
-  def random_encoded_bytes do
-    :crypto.strong_rand_bytes(64) |> Base.encode64()
+  def random_string(length) do
+    :crypto.strong_rand_bytes(length) |> Base.encode64() |> binary_part(0, length)
   end
 
   def validate_namespace!(nil), do: nil
@@ -46,14 +46,15 @@ config :teslamate, TeslaMate.Repo,
   database: System.fetch_env!("DATABASE_NAME"),
   hostname: System.fetch_env!("DATABASE_HOST"),
   port: System.get_env("DATABASE_PORT", "5432"),
+  ssl: System.get_env("DATABASE_SSL", "false") == "true",
   pool_size: System.get_env("DATABASE_POOL_SIZE", "10") |> String.to_integer(),
   timeout: System.get_env("DATABASE_TIMEOUT", "60000") |> String.to_integer()
 
 config :teslamate, TeslaMateWeb.Endpoint,
   http: [:inet6, port: System.get_env("PORT", "4000")],
   url: [host: System.get_env("VIRTUAL_HOST", "localhost"), port: 80],
-  secret_key_base: System.get_env("SECRET_KEY_BASE", Util.random_encoded_bytes()),
-  live_view: [signing_salt: System.get_env("SIGNING_SALT", Util.random_encoded_bytes())],
+  secret_key_base: System.get_env("SECRET_KEY_BASE", Util.random_string(64)),
+  live_view: [signing_salt: System.get_env("SIGNING_SALT", Util.random_string(8))],
   check_origin: System.get_env("CHECK_ORIGIN", "false") |> Util.parse_check_origin!()
 
 if System.get_env("DISABLE_MQTT") != "true" do

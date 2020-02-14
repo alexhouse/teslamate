@@ -114,7 +114,7 @@ defmodule TeslaMateWeb.GeoFenceLiveTest do
       assert ["-130.100502"] = Floki.attribute(longitude, "value")
 
       radius = Floki.find(html, "#geo_fence_radius")
-      assert ["100"] = Floki.attribute(radius, "value")
+      assert ["100.0"] = Floki.attribute(radius, "value")
 
       html =
         render_submit(view, :save, %{geo_fence: %{name: "", radius: ""}})
@@ -151,61 +151,17 @@ defmodule TeslaMateWeb.GeoFenceLiveTest do
       assert ["-130.100502"] = Floki.attribute(longitude, "value")
 
       radius = Floki.find(html, "#geo_fence_radius")
-      assert ["100"] = Floki.attribute(radius, "value")
+      assert ["100.0"] = Floki.attribute(radius, "value")
 
-      assert {:error, {:redirect, %{to: "/geo-fences"}}} =
-               render_submit(view, :save, %{
-                 geo_fence: %{name: "Adamstown", longitude: 0, latitude: 0, radius: 20}
-               })
+      render_submit(view, :save, %{
+        geo_fence: %{name: "Adamstown", longitude: 0, latitude: 0, radius: 20}
+      })
+
+      assert_redirect(view, "/geo-fences")
 
       assert {:ok, view, html} = live(conn, "/geo-fences")
 
       assert ["Adamstown", "0.0, 0.0", "20 m", _] =
-               html |> Floki.parse_document!() |> Floki.find("td") |> Enum.map(&Floki.text/1)
-    end
-
-    test "allows editing of a geo-fence with radius being displayed in ft", %{conn: conn} do
-      {:ok, _settings} =
-        Settings.get_global_settings!() |> Settings.update_global_settings(%{unit_of_length: :mi})
-
-      %GeoFence{id: id} =
-        geofence_fixture(%{
-          name: "Post office",
-          latitude: -25.066188,
-          longitude: -130.100502,
-          radius: 20
-        })
-
-      assert {:ok, view, html} = live(conn, "/geo-fences/#{id}/edit")
-
-      radius =
-        html
-        |> Floki.parse_document!()
-        |> Floki.find("#geo_fence_radius")
-
-      assert ["66.0"] = Floki.attribute(radius, "value")
-
-      assert {:error, {:redirect, %{to: "/geo-fences"}}} =
-               render_submit(view, :save, %{
-                 geo_fence: %{
-                   name: "Post office",
-                   latitude: -25.066188,
-                   longitude: -130.100502,
-                   radius: 30
-                 }
-               })
-
-      assert {:ok, view, html} = live(conn, "/geo-fences")
-
-      assert ["Post office", "-25.06619, -130.1005", "30 ft", _] =
-               html |> Floki.parse_document!() |> Floki.find("td") |> Enum.map(&Floki.text/1)
-
-      {:ok, _settings} =
-        Settings.get_global_settings!() |> Settings.update_global_settings(%{unit_of_length: :km})
-
-      assert {:ok, view, html} = live(conn, "/geo-fences")
-
-      assert ["Post office", "-25.06619, -130.1005", "9 m", _] =
                html |> Floki.parse_document!() |> Floki.find("td") |> Enum.map(&Floki.text/1)
     end
   end
@@ -256,17 +212,16 @@ defmodule TeslaMateWeb.GeoFenceLiveTest do
 
       assert [
                field_position,
-               fields_name_and_radius,
+               field_name,
                field_cost_per_kwh,
                field_sleep_mode,
                _
              ] = Floki.find(html, ".field.is-horizontal")
 
-      assert ["can't be blank", "can't be blank"] =
+      assert ["can't be blank", "can't be blank", "can't be blank"] =
                field_position |> Floki.find("span") |> Enum.map(&Floki.text/1)
 
-      assert ["can't be blank", "can't be blank"] =
-               fields_name_and_radius |> Floki.find("span") |> Enum.map(&Floki.text/1)
+      assert ["can't be blank"] = field_name |> Floki.find("span") |> Enum.map(&Floki.text/1)
 
       assert "is invalid" =
                field_cost_per_kwh
@@ -298,7 +253,7 @@ defmodule TeslaMateWeb.GeoFenceLiveTest do
 
       assert [
                field_position,
-               fields_name_and_radius,
+               field_name,
                field_cost_per_kwh,
                _field_sleep_mode,
                _
@@ -308,7 +263,7 @@ defmodule TeslaMateWeb.GeoFenceLiveTest do
                field_position |> Floki.find("span") |> Enum.map(&Floki.text/1)
 
       assert [] =
-               fields_name_and_radius
+               field_name
                |> Floki.find("span")
                |> Enum.map(&Floki.text/1)
 
@@ -327,44 +282,21 @@ defmodule TeslaMateWeb.GeoFenceLiveTest do
              |> Floki.find("#geo_fence_radius")
              |> Floki.attribute("value") == ["20"]
 
-      assert {:error, {:redirect, %{to: "/geo-fences"}}} =
-               render_submit(view, :save, %{
-                 geo_fence: %{
-                   name: "post office",
-                   latitude: -25.066188,
-                   longitude: -130.100502,
-                   radius: 25
-                 }
-               })
+      render_submit(view, :save, %{
+        geo_fence: %{
+          name: "post office",
+          latitude: -25.066188,
+          longitude: -130.100502,
+          radius: 25
+        }
+      })
+
+      assert_redirect(view, "/geo-fences")
 
       assert {:ok, view, html} = live(conn, "/geo-fences")
 
       assert ["post office", "-25.06619, -130.1005", "25 m", _] =
                html |> Floki.parse_document!() |> Floki.find("td") |> Enum.map(&Floki.text/1)
-    end
-
-    test "warn if a geo-fence already exists for a location", %{conn: conn} do
-      %GeoFence{} =
-        geofence_fixture(%{name: "Post office", latitude: -25.066188, longitude: -130.100502})
-
-      assert {:ok, view, html} = live(conn, "/geo-fences/new")
-
-      html =
-        render_submit(view, :save, %{
-          geo_fence: %{
-            name: "Post office 2",
-            latitude: -25.066188,
-            longitude: -130.100502,
-            radius: "20"
-          }
-        })
-        |> Floki.parse_document!()
-
-      assert [field_position, _field_name, _field_radius, _field_sleep_mode, _] =
-               Floki.find(html, ".field.is-horizontal")
-
-      assert ["is overlapping with other geo-fence"] =
-               field_position |> Floki.find("span") |> Enum.map(&Floki.text/1)
     end
 
     test "allows creating of a geo-fence with radius being displayed in ft", %{conn: conn} do
@@ -373,15 +305,16 @@ defmodule TeslaMateWeb.GeoFenceLiveTest do
 
       assert {:ok, view, html} = live(conn, "/geo-fences/new")
 
-      assert {:error, {:redirect, %{to: "/geo-fences"}}} =
-               render_submit(view, :save, %{
-                 geo_fence: %{
-                   name: "post office",
-                   latitude: -25.066188,
-                   longitude: -130.100502,
-                   radius: 50
-                 }
-               })
+      render_submit(view, :save, %{
+        geo_fence: %{
+          name: "post office",
+          latitude: -25.066188,
+          longitude: -130.100502,
+          radius: 15.2
+        }
+      })
+
+      assert_redirect(view, "/geo-fences")
 
       assert {:ok, view, html} = live(conn, "/geo-fences")
 
@@ -432,15 +365,16 @@ defmodule TeslaMateWeb.GeoFenceLiveTest do
              |> Floki.find("#sleep_mode_#{another_car.id}")
              |> Floki.attribute("checked")
 
-    assert {:error, {:redirect, %{to: "/geo-fences"}}} =
-             render_submit(view, :save, %{
-               geo_fence: %{
-                 name: "post office",
-                 latitude: -25.066188,
-                 longitude: -130.100502,
-                 radius: 25
-               }
-             })
+    render_submit(view, :save, %{
+      geo_fence: %{
+        name: "post office",
+        latitude: -25.066188,
+        longitude: -130.100502,
+        radius: 25
+      }
+    })
+
+    assert_redirect(view, "/geo-fences")
 
     assert [
              %GeoFence{
@@ -480,8 +414,8 @@ defmodule TeslaMateWeb.GeoFenceLiveTest do
              |> Floki.find("#sleep_mode_#{another_car.id}")
              |> Floki.attribute("checked")
 
-    assert {:error, {:redirect, %{to: "/geo-fences"}}} =
-             render_submit(view, :save, %{geo_fence: %{name: "post_office", radius: 20}})
+    render_submit(view, :save, %{geo_fence: %{name: "post_office", radius: 20}})
+    assert_redirect(view, "/geo-fences")
 
     assert [
              %GeoFence{
